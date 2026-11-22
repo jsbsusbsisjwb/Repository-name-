@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#101522"><title>التحقق من أنك إنسان</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <style>
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:#101522;color:#f4f6fb;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:grid;place-items:center;padding:22px}
+    main{width:min(100%,430px);background:#1a2233;border:1px solid #303b52;border-radius:22px;padding:26px 22px;text-align:center;box-shadow:0 18px 55px #0005}
+    h2{margin:0 0 12px;font-size:23px}p{color:#c2cada;line-height:1.8;margin:0 0 22px}.captcha{display:flex;justify-content:center;min-height:68px;margin:14px 0}
+    button{width:100%;border:0;border-radius:13px;padding:14px;background:#3979e8;color:white;font-size:16px;font-weight:700;margin-top:12px}button:disabled{opacity:.5}#status{min-height:28px;margin-top:15px;color:#cbd5e1;font-size:14px}
+  </style>
+</head>
+<body>
+<main>
+  <h2>🛡️ التحقق من أنك إنسان</h2>
+  <p>أكمل الفحص أدناه، وبعد نجاحه سترجع إلى البوت تلقائياً لإكمال المشاركة أو التصويت.</p>
+  <div class="captcha"><div class="cf-turnstile" data-sitekey="{{ site_key }}" data-theme="dark" data-callback="captchaSolved" data-expired-callback="captchaExpired"></div></div>
+  <button id="go" disabled onclick="submitVerification()">تأكيد التحقق</button>
+  <div id="status">انتظر تحميل اختبار التحقق…</div>
+</main>
+<script>
+const tg = window.Telegram?.WebApp;
+const params = new URLSearchParams(location.search);
+const state = params.get('state') || '';
+let captchaToken = '';
+if (tg) { tg.ready(); tg.expand(); }
+function captchaSolved(token){ captchaToken=token; document.getElementById('go').disabled=false; document.getElementById('status').textContent='اكتمل الفحص، اضغط تأكيد التحقق.'; }
+function captchaExpired(){ captchaToken=''; document.getElementById('go').disabled=true; document.getElementById('status').textContent='انتهت صلاحية الفحص، أعد المحاولة.'; }
+async function submitVerification(){
+  const btn=document.getElementById('go'), status=document.getElementById('status');
+  if(!tg || !tg.initData){ status.textContent='افتح الصفحة من زر البوت داخل تليجرام.'; return; }
+  if(!state || !captchaToken){ status.textContent='أكمل الفحص أولاً.'; return; }
+  btn.disabled=true; status.textContent='جاري التأكد…';
+  try{
+    const r=await fetch('/verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({state,initData:tg.initData,token:captchaToken})});
+    const d=await r.json();
+    if(!r.ok || !d.ok) throw new Error(d.error || 'تعذر التحقق');
+    tg.sendData(JSON.stringify({uid:d.uid,state:d.state,ts:d.ts,proof:d.proof}));
+    status.textContent='نجح التحقق، جاري الرجوع للبوت…';
+  }catch(e){status.textContent=e.message || 'حدث خطأ. حاول مرة أخرى.';btn.disabled=false;}
+}
+</script>
+</body></html>
